@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIDHO TRADE V3 - MULTI ASSET PRO</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0b0e11;
+            --card: #181a20;
+            --primary: #f0b90b;
+            --green: #0ecb81;
+            --red: #f6465d;
+            --text: #eaecef;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            user-select: none;
+        }
+
+        /* --- Global Layout --- */
+        #login-page, #main-page { min-height: 100vh; }
+        
+        header {
+            background: var(--card);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        /* --- Market List Sidebar --- */
+        .market-list {
+            display: flex;
+            overflow-x: auto;
+            background: #1e2329;
+            padding: 10px;
+            gap: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .asset-card {
+            min-width: 120px;
+            background: var(--card);
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+
+        .asset-card.active { border-color: var(--primary); }
+        .price-up { color: var(--green); }
+        .price-down { color: var(--red); }
+
+        /* --- Chart Section --- */
+        .chart-wrapper {
+            height: 350px;
+            width: 100%;
+            background: var(--bg);
+            position: relative;
+        }
+
+        /* --- Trade Panel --- */
+        .trade-panel {
+            padding: 20px;
+            background: var(--card);
+            border-radius: 20px 20px 0 0;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label { font-size: 12px; color: #848e9c; }
+        
+        input {
+            width: 100%;
+            background: #2b3139;
+            border: 1px solid #474d57;
+            padding: 12px;
+            color: white;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .action-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            border: none;
+            padding: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-buy { background: var(--green); color: white; }
+        .btn-sell { background: var(--red); color: white; }
+
+        /* --- UI Components --- */
+        .badge-premium {
+            background: linear-gradient(45deg, gold, orange);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .payment-opt {
+            background: #2b3139;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-page">
+    <div style="padding: 50px 20px; text-align: center;">
+        <h1 style="color: var(--primary); font-style: italic;">RIDHO V3 PRO</h1>
+        <p>Login with Google Account</p>
+        <div style="background: var(--card); padding: 30px; border-radius: 10px;">
+            <input type="email" id="userEmail" placeholder="example@gmail.com" value="ridho@gmail.com"><br><br>
+            <input type="password" id="userPass" placeholder="Password"><br><br>
+            <button onclick="doLogin()" style="width: 100%; background: var(--primary); border: none; padding: 15px; font-weight: bold; border-radius: 5px;">LOGIN</button>
+        </div>
+    </div>
+</div>
+
+<div id="main-page" style="display: none;">
+    <header>
+        <div>
+            <span id="displayMail" style="font-size: 12px; color: var(--primary);"></span><br>
+            <b style="font-style: italic;">RIDHO <span class="badge-premium">V3</span></b>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 12px; color: #848e9c;">Saldo IDR</div>
+            <div id="balanceDisp" style="color: var(--green); font-weight: bold; font-size: 18px;">Rp 0</div>
+        </div>
+    </header>
+
+    <div class="market-list" id="market-container">
+        </div>
+
+    <div class="chart-wrapper">
+        <canvas id="mainChart"></canvas>
+    </div>
+
+    <div class="trade-panel">
+        <div class="input-group">
+            <label>Investasi (Min 15k)</label>
+            <input type="number" id="tradeInp" value="15000">
+        </div>
+        <div class="action-btns">
+            <button class="btn btn-buy" onclick="trade('UP')">BELI (CALL)</button>
+            <button class="btn btn-sell" onclick="trade('DOWN')">JUAL (PUT)</button>
+        </div>
+        <div style="display: flex; justify-content: space-around; margin-top: 15px;">
+            <small onclick="openModal('depo')" style="color: var(--primary); cursor: pointer;">➕ DEPOSIT</small>
+            <small onclick="openModal('wd')" style="color: #848e9c; cursor: pointer;">💸 PENARIKAN</small>
+        </div>
+    </div>
+</div>
+
+<div id="modal-depo" class="modal">
+    <h3>Deposit Saldo</h3>
+    <input type="number" id="depoAmt" placeholder="Jumlah (Contoh: 50000)">
+    <div class="payment-opt" onclick="confirmDepo('DANA')">DANA <span>></span></div>
+    <div class="payment-opt" onclick="confirmDepo('OVO')">OVO <span>></span></div>
+    <div class="payment-opt" onclick="confirmDepo('GOPAY')">GOPAY <span>></span></div>
+    <div class="payment-opt" onclick="confirmDepo('BRI/BRIMO')">BRI / BRIMO <span>></span></div>
+    <button onclick="closeModal()" style="width:100%; background:none; color:white; border:1px solid #444; padding:10px; margin-top:10px;">BATAL</button>
+</div>
+
+<div id="modal-wd" class="modal">
+    <h3>Tarik Saldo</h3>
+    <input type="number" id="wdAmt" placeholder="Nominal Penarikan">
+    <div class="payment-opt" onclick="confirmWD('DANA')">Transfer DANA <span>></span></div>
+    <div class="payment-opt" onclick="confirmWD('BANK')">Transfer BANK <span>></span></div>
+    <button onclick="closeModal()" style="width:100%; background:none; color:white; border:1px solid #444; padding:10px; margin-top:10px;">BATAL</button>
+</div>
+
+<script>
+    // DATA SAHAM & ASSET
+    const assets = [
+        { name: 'CRYPTO/BTC', price: 1000000000, history: [], color: '#f0b90b' },
+        { name: 'SAHAM/BBCA', price: 5000000000, history: [], color: '#0047bb' },
+        { name: 'SAHAM/GOTO', price: 5000000, history: [], color: '#00cb44' },
+        { name: 'FOREX/USD', price: 15600, history: [], color: '#85bb65' },
+        { name: 'SAHAM/AAPL', price: 3000000000, history: [], color: '#ffffff' }
+    ];
+
+    let activeAssetIdx = 0;
+    let balance = 1000000; // Saldo awal simulasi 1jt
+    let chart;
+
+    function doLogin() {
+        const email = document.getElementById('userEmail').value;
+        if(email.includes('@')) {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-page').style.display = 'block';
+            document.getElementById('displayMail').innerText = email;
+            initMarket();
+            initChart();
+            startPriceEngine();
+        }
+    }
+
+    function initMarket() {
+        const container = document.getElementById('market-container');
+        container.innerHTML = '';
+        assets.forEach((asset, idx) => {
+            asset.history = Array(30).fill(asset.price);
+            const div = document.createElement('div');
+            div.className = `asset-card ${idx === activeAssetIdx ? 'active' : ''}`;
+            div.id = `asset-${idx}`;
+            div.onclick = () => switchAsset(idx);
+            div.innerHTML = `
+                <div style="font-size: 10px; color: #848e9c;">${asset.name}</div>
+                <div class="price" style="font-weight:bold; font-size:12px;">Rp ${asset.price.toLocaleString()}</div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function switchAsset(idx) {
+        activeAssetIdx = idx;
+        document.querySelectorAll('.asset-card').forEach(c => c.classList.remove('active'));
+        document.getElementById(`asset-${idx}`).classList.add('active');
+        chart.data.datasets[0].data = assets[idx].history;
+        chart.data.datasets[0].borderColor = assets[idx].color;
+        chart.update();
+    }
+
+    function initChart() {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(30).fill(''),
+                datasets: [{
+                    data: assets[activeAssetIdx].history,
+                    borderColor: varColor('--primary'),
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    backgroundColor: 'rgba(240, 185, 11, 0.05)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: { 
+                    x: { display: false }, 
+                    y: { position: 'right', grid: { color: '#222' }, ticks: { color: '#848e9c', font: { size: 10 } } } 
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function startPriceEngine() {
+        setInterval(() => {
+            assets.forEach((asset, idx) => {
+                const volatility = asset.price * 0.002;
+                const change = (Math.random() - 0.5) * volatility;
+                asset.price += change;
+                asset.history.push(asset.price);
+                asset.history.shift();
+
+                // Update UI Market List
+                const card = document.getElementById(`asset-${idx}`);
+                const priceDiv = card.querySelector('.price');
+                priceDiv.innerText = "Rp " + asset.price.toLocaleString(undefined, {maximumFractionDigits:0});
+                priceDiv.className = change >= 0 ? 'price price-up' : 'price price-down';
+            });
+            chart.update();
+            document.getElementById('balanceDisp').innerText = "Rp " + balance.toLocaleString();
+        }, 1000);
+    }
+
+    function trade(type) {
+        const amt = parseInt(document.getElementById('tradeInp').value);
+        if(amt > balance) return alert("Saldo Kurang!");
+        if(amt < 15000) return alert("Minimal 15rb!");
+
+        balance -= amt;
+        const entryPrice = assets[activeAssetIdx].price;
+        alert(`POSISI ${type} DIBUKA\nAset: ${assets[activeAssetIdx].name}\nHarga: Rp ${entryPrice.toLocaleString()}`);
+
+        setTimeout(() => {
+            const exitPrice = assets[activeAssetIdx].price;
+            let win = false;
+            if(type === 'UP' && exitPrice > entryPrice) win = true;
+            if(type === 'DOWN' && exitPrice < entryPrice) win = true;
+
+            if(win) {
+                const profit = amt * 1.85;
+                balance += profit;
+                alert(`PROFIT! 🎉\nHarga Naik Menjadi: Rp ${exitPrice.toLocaleString()}\nAnda Mendapatkan: Rp ${profit.toLocaleString()}`);
+            } else {
+                alert(`LOSS! 📉\nHarga Bergerak Melawan Anda.\nSaldo Berkurang.`);
+            }
+        }, 5000);
+    }
+
+    function openModal(id) { document.getElementById('modal-' + id).style.display = 'block'; }
+    function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+
+    function confirmDepo(method) {
+        const amt = parseInt(document.getElementById('depoAmt').value);
+        if(amt >= 5000) {
+            balance += (amt - 3000);
+            alert(`Deposit via ${method} Berhasil!\nSaldo ditambah (potong admin 3rb).`);
+            closeModal();
+        }
+    }
+
+    function confirmWD(method) {
+        const amt = parseInt(document.getElementById('wdAmt').value);
+        if(amt > 0 && amt <= balance) {
+            balance -= amt;
+            alert(`Uang sejumlah Rp ${amt.toLocaleString()} telah ditarik ke ${method}!\nSaldo Anda Berkurang.`);
+            closeModal();
+        } else { alert("Saldo tidak cukup!"); }
+    }
+
+    function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
+</script>
+</body>
+</html>
